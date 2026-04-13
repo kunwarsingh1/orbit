@@ -25,9 +25,10 @@ type SourcingPhaseDockProps = {
 
 function PhaseStatusPill({ status }: { status: PhaseShowcaseStatus }) {
   const cfg = {
-    active: "border-emerald-400/45 bg-emerald-500/15 text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.15)]",
-    upcoming: "border-sky-400/40 bg-sky-500/10 text-sky-200",
-    planned: "border-white/15 bg-white/5 text-muted-foreground",
+    active:
+      "border-emerald-500/40 bg-emerald-500/12 text-emerald-800 shadow-[0_0_12px_rgba(16,185,129,0.12)]",
+    upcoming: "border-sky-400/45 bg-sky-500/12 text-sky-800",
+    planned: "border-primary/20 bg-primary/8 text-muted-foreground",
   }[status];
   const label = status === "active" ? "ACTIVE" : status === "upcoming" ? "UPCOMING" : "PLANNED";
   return (
@@ -54,14 +55,14 @@ function DeliverableStatusBadge({ owner }: { owner: string }) {
   }
   if (kind === "in_progress") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/45 bg-amber-500/12 px-2 py-0.5 font-display text-[10px] font-medium uppercase tracking-wide text-amber-200">
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/45 bg-amber-500/12 px-2 py-0.5 font-display text-[10px] font-medium uppercase tracking-wide text-amber-900">
         <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
         In Progress
       </span>
     );
   }
   return (
-    <span className="rounded-full border border-white/12 bg-white/5 px-2 py-0.5 font-display text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    <span className="rounded-full border border-border bg-muted/60 px-2 py-0.5 font-display text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
       {owner}
     </span>
   );
@@ -87,14 +88,14 @@ const SourcingPhaseDock = ({ activePhase, onPhaseSelect, onClear }: SourcingPhas
   return (
     <div
       className={cn(
-        "flex min-h-0 w-full flex-col border-t border-primary/15 bg-background/40 backdrop-blur-sm",
+        "flex min-h-0 w-full flex-col border-t border-primary/15 bg-background/55 backdrop-blur-md",
         activePhase !== null && "min-h-0 flex-1",
       )}
     >
       {phaseData !== null && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* Top tabs — match reference: phase + date range */}
-          <div className="shrink-0 border-b border-white/10 bg-[#050a10]/80 px-3 py-3 sm:px-5">
+          <div className="shrink-0 border-b border-primary/12 bg-white/70 px-3 py-3 backdrop-blur-sm sm:px-5">
             <div
               className="flex flex-wrap items-stretch justify-center gap-2 sm:justify-between"
               role="tablist"
@@ -113,8 +114,8 @@ const SourcingPhaseDock = ({ activePhase, onPhaseSelect, onClear }: SourcingPhas
                     className={cn(
                       "flex min-w-[7.5rem] flex-col items-center rounded-lg px-3 py-2.5 font-display transition-all",
                       selected
-                        ? "bg-primary/12 text-primary shadow-[0_0_28px_rgba(56,189,248,0.35)] ring-1 ring-primary/50"
-                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                        ? "bg-primary/12 text-primary shadow-[0_0_20px_hsl(var(--glow-primary)/0.22)] ring-1 ring-primary/45"
+                        : "text-muted-foreground hover:bg-primary/8 hover:text-foreground",
                     )}
                   >
                     <span className="text-xs font-semibold uppercase tracking-wide">Phase {id}</span>
@@ -128,7 +129,7 @@ const SourcingPhaseDock = ({ activePhase, onPhaseSelect, onClear }: SourcingPhas
           </div>
 
           {/* Showcase: solid panel only — do not use a screenshot as bg behind text (it causes ghost/double labels). */}
-          <div className="relative isolate min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-[#050a10] via-[#070f18] to-[#050a10]">
+          <div className="relative isolate min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-background via-sky-50/40 to-background">
             <div className="relative z-10 px-3 py-4 sm:px-6">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -141,7 +142,7 @@ const SourcingPhaseDock = ({ activePhase, onPhaseSelect, onClear }: SourcingPhas
                   <span className="font-display text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     {phaseData.progressPercent}% Complete
                   </span>
-                  <div className="h-2 w-36 overflow-hidden rounded-full bg-white/10 sm:w-44">
+                  <div className="h-2 w-36 overflow-hidden rounded-full bg-primary/15 sm:w-44">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-primary via-sky-400 to-purple-500 transition-[width] duration-500"
                       style={{ width: `${phaseData.progressPercent}%` }}
@@ -166,7 +167,7 @@ const SourcingPhaseDock = ({ activePhase, onPhaseSelect, onClear }: SourcingPhas
                     <AccordionItem
                       key={itemId}
                       value={itemId}
-                      className="overflow-hidden rounded-lg border-0 border border-white/10 bg-[#0a1219]/85 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
+                      className="overflow-hidden rounded-lg border border-primary/15 bg-white/75 shadow-[inset_0_1px_0_0_hsl(var(--primary)/0.06)] backdrop-blur-sm"
                     >
                       <AccordionTrigger className="px-3 py-3 hover:no-underline sm:px-4">
                         <span className="flex items-center gap-3 text-left">
@@ -179,8 +180,8 @@ const SourcingPhaseDock = ({ activePhase, onPhaseSelect, onClear }: SourcingPhas
                           </span>
                         </span>
                       </AccordionTrigger>
-                      <AccordionContent className="border-t border-white/5 bg-black/20 px-3 pb-3 pt-0 sm:px-4">
-                        <div className="divide-y divide-white/5">
+                      <AccordionContent className="border-t border-primary/10 bg-primary/5 px-3 pb-3 pt-0 sm:px-4">
+                        <div className="divide-y divide-primary/10">
                           {group.rows.map((row) => (
                             <div
                               key={row.id}
@@ -206,12 +207,12 @@ const SourcingPhaseDock = ({ activePhase, onPhaseSelect, onClear }: SourcingPhas
       <div
         className={cn(
           "flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-border/50 px-3 py-3 sm:px-6",
-          phaseData === null ? "bg-background/25" : "bg-[#050a10]/90",
+          phaseData === null ? "bg-background/25" : "bg-white/80 backdrop-blur-sm",
         )}
       >
         {phaseData === null && (
           <div
-            className="inline-flex flex-wrap items-center justify-center gap-1 rounded-md bg-muted/80 p-1"
+            className="inline-flex flex-wrap items-center justify-center gap-1 rounded-md border border-primary/20 bg-white/85 p-1 shadow-sm"
             role="tablist"
             aria-label="Sourcing phases"
           >
@@ -225,8 +226,8 @@ const SourcingPhaseDock = ({ activePhase, onPhaseSelect, onClear }: SourcingPhas
                 className={cn(
                   "rounded-sm px-3 py-1.5 font-display text-xs font-medium uppercase tracking-wide transition-all",
                   activePhase === id
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-primary/15 text-primary shadow-sm ring-1 ring-primary/35"
+                    : "text-muted-foreground hover:bg-primary/8 hover:text-foreground",
                 )}
               >
                 Phase {id}

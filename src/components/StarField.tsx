@@ -17,7 +17,7 @@ const StarField = () => {
       {stars.map((star) => (
         <div
           key={star.id}
-          className="absolute rounded-full bg-foreground"
+          className="absolute rounded-full bg-muted-foreground/35"
           style={{
             left: `${star.x}%`,
             top: `${star.y}%`,

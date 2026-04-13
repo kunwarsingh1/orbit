@@ -126,7 +126,7 @@ const Index = () => {
           className={cn(
             "flex w-full flex-col",
             activePhase === null
-              ? "pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background/80 via-background/35 to-transparent pb-2 pt-12"
+              ? "pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-white/90 via-white/40 to-transparent pb-2 pt-12"
               : "relative z-20 min-h-0 flex-1 pt-2",
           )}
         >
@@ -148,7 +148,7 @@ const Index = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5, duration: 0.8 }}
-        className="relative z-10 flex shrink-0 flex-wrap items-center justify-center gap-6 px-4 py-4 text-xs text-muted-foreground md:gap-8 font-body"
+        className="relative z-10 flex shrink-0 flex-wrap items-center justify-center gap-6 border-t border-slate-700/50 bg-slate-800 px-4 py-4 text-xs text-slate-300 md:gap-8 font-body"
       >
         <span>PRODUCT: 360 Sourcing Suite</span>
         <span className="hidden sm:inline">WORKFLOW: Source-to-contract</span>

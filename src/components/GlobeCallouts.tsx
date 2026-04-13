@@ -57,7 +57,7 @@ const GlobeCallouts = ({ onCalloutClick, visible = true, activePhase = null }: G
                 y2={node.y}
                 stroke="currentColor"
                 strokeOpacity={inPhase ? 0.55 : 0.45}
-                strokeWidth={0.75}
+                strokeWidth={0.85}
               />
             );
           })}
@@ -85,7 +85,7 @@ const GlobeCallouts = ({ onCalloutClick, visible = true, activePhase = null }: G
             >
               <p
                 className={cn(
-                  "line-clamp-2 min-h-[1.375rem] font-display text-[8px] font-semibold uppercase leading-tight tracking-wide",
+                  "line-clamp-2 min-h-[1.5rem] font-display text-[9px] font-semibold uppercase leading-tight tracking-wide",
                   inPhase ? "text-emerald-200" : "text-primary",
                 )}
               >
@@ -101,13 +101,13 @@ const GlobeCallouts = ({ onCalloutClick, visible = true, activePhase = null }: G
               </p>
               <p
                 className={cn(
-                  "flex min-h-[0.8125rem] items-center gap-1 font-display text-[7px] uppercase leading-none tracking-wider",
+                  "flex min-h-[0.9375rem] items-center gap-1 font-display text-[8px] uppercase leading-none tracking-wider",
                   inPhase ? "text-emerald-200" : "text-primary",
                 )}
               >
                 <span
                   className={cn(
-                    "h-1 w-1 shrink-0 rounded-full",
+                    "h-1.5 w-1.5 shrink-0 rounded-full",
                     inPhase
                       ? "bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.85)]"
                       : "bg-primary shadow-[0_0_5px_hsl(var(--glow-primary)/0.85)]",

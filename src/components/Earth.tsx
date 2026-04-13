@@ -15,15 +15,15 @@ import EarthGlobeMesh from "@/components/EarthGlobeMesh";
 
 /** Overlay / HUD viewBox center (e.g. 190 when VIEW is 380). */
 const CENTER = VIEW / 2;
-const R_RING_OUTER = CENTER - 8;
-const R_RING_DASH = CENTER - 22;
-const R_TICK_OUT = CENTER - 8;
-const R_TICK_IN_MAJOR = CENTER - 16;
-const R_TICK_IN_MINOR = CENTER - 11;
+const R_RING_OUTER = CENTER - 5;
+const R_RING_DASH = CENTER - 15;
+const R_TICK_OUT = CENTER - 5;
+const R_TICK_IN_MAJOR = CENTER - 10;
+const R_TICK_IN_MINOR = CENTER - 6;
 /** Scanner sweep arc radius (matches outer ring). */
 const R_SWEEP = R_RING_OUTER;
-const SWEEP_TOP = CENTER - 178;
-const SWEEP_PATH_INNER_X = CENTER - 8;
+const SWEEP_TOP = CENTER - 170;
+const SWEEP_PATH_INNER_X = CENTER - 5;
 const TEXT_INSET = 20;
 const TEXT_TOP = 15;
 const TEXT_BOTTOM = VIEW - 15;
@@ -211,7 +211,7 @@ const Earth = forwardRef<EarthHandle, EarthProps>(function Earth(
 
   return (
     <div
-      className="relative mx-auto flex h-[min(400px,min(72vw,440px))] w-[min(400px,min(72vw,440px))] items-center justify-center overflow-visible"
+      className="relative mx-auto flex h-[min(340px,min(62vw,380px))] w-[min(340px,min(62vw,380px))] items-center justify-center overflow-visible"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -236,8 +236,8 @@ const Earth = forwardRef<EarthHandle, EarthProps>(function Earth(
         <motion.div
           className="relative z-[1] shrink-0 rounded-full overflow-hidden transition-shadow duration-500"
           style={{
-            width: "min(300px, 79%)",
-            height: "min(300px, 79%)",
+            width: "min(252px, 74%)",
+            height: "min(252px, 74%)",
             aspectRatio: "1",
             transformOrigin: "center center",
             boxShadow: hovered
@@ -251,12 +251,12 @@ const Earth = forwardRef<EarthHandle, EarthProps>(function Earth(
             <svg viewBox="0 0 300 300" className="pointer-events-none absolute inset-0 z-0 h-full w-full">
               <defs>
                 <radialGradient id="meshCoreGlow" cx="50%" cy="50%" r="65%">
-                  <stop offset="0%" stopColor="hsl(190 95% 55% / 0.14)" />
+                  <stop offset="0%" stopColor="hsl(192 55% 92% / 0.35)" />
                   <stop offset="55%" stopColor="transparent" />
                   <stop offset="100%" stopColor="transparent" />
                 </radialGradient>
               </defs>
-              <rect x="0" y="0" width="300" height="300" fill="hsl(220 42% 8% / 0.52)" />
+              <rect x="0" y="0" width="300" height="300" fill="hsl(0 0% 100% / 0.97)" />
               <circle cx="150" cy="150" r="148" fill="url(#meshCoreGlow)" opacity={0.75} />
             </svg>
             <div className="absolute inset-0 z-[1] overflow-hidden rounded-full">
@@ -269,14 +269,14 @@ const Earth = forwardRef<EarthHandle, EarthProps>(function Earth(
             >
               <defs>
                 <radialGradient id="earthShadingOverlay" cx="50%" cy="48%">
-                  <stop offset="0%" stopColor="hsl(190 90% 55% / 0.12)" />
-                  <stop offset="45%" stopColor="hsl(200 50% 20% / 0.08)" />
-                  <stop offset="82%" stopColor="hsl(230 45% 6% / 0.55)" />
-                  <stop offset="100%" stopColor="hsl(230 40% 2% / 0.92)" />
+                  <stop offset="0%" stopColor="hsl(0 0% 100% / 0.35)" />
+                  <stop offset="45%" stopColor="hsl(195 40% 98% / 0.25)" />
+                  <stop offset="82%" stopColor="hsl(200 35% 94% / 0.3)" />
+                  <stop offset="100%" stopColor="hsl(205 28% 90% / 0.4)" />
                 </radialGradient>
               </defs>
               <circle cx="150" cy="150" r="150" fill="url(#earthShadingOverlay)" />
-              <ellipse cx="150" cy="110" rx="52" ry="44" fill="hsl(190 70% 75% / 0.04)" />
+              <ellipse cx="150" cy="110" rx="52" ry="44" fill="hsl(0 0% 100% / 0.2)" />
             </svg>
           </div>
 
@@ -284,7 +284,7 @@ const Earth = forwardRef<EarthHandle, EarthProps>(function Earth(
             className="pointer-events-none absolute inset-0 rounded-full"
             style={{
               background:
-                "radial-gradient(circle at 50% 45%, transparent 32%, hsl(190 85% 55% / 0.08) 58%, hsl(190 80% 45% / 0.14) 85%, hsl(190 75% 35% / 0.22) 100%)",
+                "radial-gradient(circle at 50% 45%, transparent 32%, hsl(192 45% 96% / 0.5) 58%, hsl(195 40% 92% / 0.35) 85%, hsl(200 35% 88% / 0.28) 100%)",
             }}
           />
 
@@ -368,9 +368,9 @@ const Earth = forwardRef<EarthHandle, EarthProps>(function Earth(
             <g key={pt.id}>
               <circle
                 className="pointer-events-none"
-                cx={pt.x}
-                cy={pt.y}
-                r={pt.r * 3}
+                cx={pt.x + 10}
+                cy={pt.y+10}
+                r={pt.r * 2}
                 fill="none"
                 stroke="hsl(var(--glow-primary) / 0.28)"
                 strokeWidth="0.5"

@@ -85,7 +85,7 @@ export function phaseAccordionPanelTitle(step: string): string {
     "AICM — Costing": "AICM – Cost Intelligence",
     Transport: "Transport Optimization",
     "Spend Management": "Spend Management",
-    "SOB allocation & forecasting": "SOB allocation & forecasting",
+    "Supplier Forcasting Management": "Supplier Forcasting Management",
     NPD: "NPD",
     "ESG + EHS": "ESG + EHS",
     "Suite-wide": "Suite-wide",

@@ -53,7 +53,7 @@ export const panelsLeft: DashboardPanel[] = [
     ],
   },
   {
-    title: "SOB allocation & forecasting",
+    title: "Supplier Forcasting Management",
     value: 0,
     suffix: "",
     decimals: 0,

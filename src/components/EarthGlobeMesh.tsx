@@ -5,7 +5,8 @@ import * as THREE from "three";
 
 const LOGO_URL = "/unnamed.png";
 
-const PRIMARY = "#5cd8e8";
+const PRIMARY = "#2ea3c4";
+const SPHERE_BASE = "#ffffff";
 
 /** Same visibility rule as the legacy SVG orthographic projection. */
 function spherePoint(latDeg: number, lonDeg: number): { x: number; y: number; z: number } | null {
@@ -41,7 +42,7 @@ function PointField({ points }: { points: ReturnType<typeof useMeshPoints> }) {
   return (
     <Instances limit={limit} range={limit}>
       <sphereGeometry args={[1, 6, 6]} />
-      <meshBasicMaterial color={PRIMARY} transparent opacity={0.5} depthWrite={false} />
+      <meshBasicMaterial color={PRIMARY} transparent opacity={0.42} depthWrite={false} />
       {points.map((p, i) => (
         <Instance key={i} position={[p.x, p.y, p.z]} scale={p.r * 0.018} />
       ))}
@@ -61,11 +62,11 @@ function GlobeMeshes({ meshPaused, points }: { meshPaused: boolean; points: Retu
     <group ref={groupRef}>
       <mesh>
         <sphereGeometry args={[1, 64, 48]} />
-        <meshBasicMaterial color="#151d28" transparent opacity={0.88} />
+        <meshBasicMaterial color={SPHERE_BASE} transparent opacity={0.96} />
       </mesh>
       <mesh>
         <sphereGeometry args={[1, 48, 32]} />
-        <meshBasicMaterial color={PRIMARY} wireframe transparent opacity={0.22} depthWrite={false} />
+        <meshBasicMaterial color={PRIMARY} wireframe transparent opacity={0.28} depthWrite={false} />
       </mesh>
       <PointField points={points} />
     </group>

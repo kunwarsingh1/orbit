@@ -47,8 +47,8 @@ export const earthNodes: EarthNode[] = [
   },
   {
     id: "sob",
-    name: "SOB allocation & forecasting",
-    productTitle: "SOB",
+    name: "Supplier Forcasting Management",
+    productTitle: "Supplier Forcasting Management",
     region: "Suite · Forecast",
     latDisplay: "—",
     lonDisplay: "—",
