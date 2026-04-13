@@ -10,7 +10,7 @@ const DataLines = () => {
 
   return (
     <svg
-      className="absolute inset-0 w-full h-full pointer-events-none"
+      className="pointer-events-none h-full w-full"
       viewBox="0 0 800 600"
       preserveAspectRatio="xMidYMid slice"
     >

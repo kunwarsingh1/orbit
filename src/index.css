@@ -97,9 +97,39 @@
   }
 }
 
-@keyframes earth-rotate {
-  from { background-position-x: 0; }
-  to { background-position-x: -800px; }
+@keyframes earth-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-400px);
+  }
+}
+
+/* SVG <g> seamless horizontal loop; pairs with duplicated landmass (+400px offset) */
+.earth-scroll-inner {
+  transform-box: fill-box;
+  transform-origin: center center;
+  animation: earth-scroll 40s linear infinite;
+}
+
+@keyframes earth-mesh-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Rotate around the actual disk center (responsive), not SVG 150×150 — wrong origin made the mesh drift vs the outer ring */
+.earth-mesh-spin {
+  transform-origin: center center;
+  animation: earth-mesh-spin 200s linear infinite;
+}
+
+.earth-mesh-spin-paused {
+  animation-play-state: paused !important;
 }
 
 @keyframes pulse-glow {

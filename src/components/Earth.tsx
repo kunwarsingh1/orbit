@@ -1,290 +1,489 @@
-import { useState } from "react";
+import {
+  useState,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useEffect,
+} from "react";
+import { motion, useAnimationControls } from "framer-motion";
+import { earthNodes, type EarthNode } from "@/data/earthNodes";
+import { calloutRingAnchor, GLOBE_VIEW as VIEW } from "@/data/globeCalloutLayout";
+import type { PhaseId } from "@/data/sourcingPhases";
+import GlobeCallouts from "@/components/GlobeCallouts";
+import EarthGlobeMesh from "@/components/EarthGlobeMesh";
 
-const Earth = () => {
+/** Overlay / HUD viewBox center (e.g. 190 when VIEW is 380). */
+const CENTER = VIEW / 2;
+const R_RING_OUTER = CENTER - 8;
+const R_RING_DASH = CENTER - 22;
+const R_TICK_OUT = CENTER - 8;
+const R_TICK_IN_MAJOR = CENTER - 16;
+const R_TICK_IN_MINOR = CENTER - 11;
+/** Scanner sweep arc radius (matches outer ring). */
+const R_SWEEP = R_RING_OUTER;
+const SWEEP_TOP = CENTER - 178;
+const SWEEP_PATH_INNER_X = CENTER - 8;
+const TEXT_INSET = 20;
+const TEXT_TOP = 15;
+const TEXT_BOTTOM = VIEW - 15;
+/** Crosshair tick offsets from center. */
+const CH_OUT = 18;
+const CH_IN = 12;
+
+export type ZoomOriginMode = "callout" | "globe";
+
+function zoomScaleForViewport(viewportSize: number, reducedMotion: boolean): number {
+  if (reducedMotion) return Math.min(2.75, 2.4);
+  const s = viewportSize / 30;
+  return Math.min(15, Math.max(7, s));
+}
+
+function waitForLayoutCommit(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
+export type EarthHandle = {
+  nudgeRotate: () => Promise<void>;
+  focusPanel: (panelIndex: number, origin?: ZoomOriginMode) => Promise<void>;
+  resetCamera: () => Promise<void>;
+};
+
+export type EarthProps = {
+  onFocusAnimationComplete?: (panelIndex: number) => void;
+  /** When set, globe callouts for products in this phase are highlighted (e.g. green). */
+  activePhase?: PhaseId | null;
+};
+
+const Earth = forwardRef<EarthHandle, EarthProps>(function Earth(
+  { onFocusAnimationComplete, activePhase = null },
+  ref,
+) {
   const [hovered, setHovered] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<EarthNode>(earthNodes[0]);
+  const [meshPaused, setMeshPaused] = useState(false);
+  const [calloutsVisible, setCalloutsVisible] = useState(true);
+  const [viewportOrigin, setViewportOrigin] = useState("50% 50%");
+  const [viewportSize, setViewportSize] = useState(380);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const isAnimatingRef = useRef(false);
+
+  const earthDiskControls = useAnimationControls();
+  const cameraControls = useAnimationControls();
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const fn = () => setReducedMotion(mq.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) setViewportSize(w);
+    });
+    ro.observe(el);
+    const w = el.getBoundingClientRect().width;
+    if (w > 0) setViewportSize(w);
+    return () => ro.disconnect();
+  }, []);
+
+  const runNudgeAnimation = useCallback(async () => {
+    await earthDiskControls.start({
+      rotate: [0, 10, 0],
+      transition: { duration: reducedMotion ? 0.2 : 0.6, ease: "easeInOut" },
+    });
+  }, [earthDiskControls, reducedMotion]);
+
+  const resetCamera = useCallback(async () => {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
+    try {
+      setViewportOrigin("50% 50%");
+      await waitForLayoutCommit();
+      await cameraControls.start({
+        scale: 1,
+        transition: { duration: reducedMotion ? 0.2 : 0.55, ease: [0.22, 1, 0.36, 1] },
+      });
+      await earthDiskControls.start({
+        rotate: 0,
+        transition: { duration: reducedMotion ? 0.15 : 0.45, ease: "easeOut" },
+      });
+      setMeshPaused(false);
+      setCalloutsVisible(true);
+    } finally {
+      isAnimatingRef.current = false;
+    }
+  }, [cameraControls, earthDiskControls, reducedMotion]);
+
+  const focusSequence = useCallback(
+    async (panelIndex: number, origin: ZoomOriginMode = "globe") => {
+      if (isAnimatingRef.current) return;
+      isAnimatingRef.current = true;
+      const i = Math.max(0, Math.min(earthNodes.length - 1, panelIndex));
+      const node = earthNodes[i];
+      try {
+        setSelectedNode(node);
+        setMeshPaused(true);
+        setCalloutsVisible(false);
+
+        const { x: oxPx, y: oyPx } =
+          origin === "callout"
+            ? calloutRingAnchor(i, activePhase !== null)
+            : { x: node.x, y: node.y };
+        const ox = `${(oxPx / VIEW) * 100}%`;
+        const oy = `${(oyPx / VIEW) * 100}%`;
+        setViewportOrigin(`${ox} ${oy}`);
+        await waitForLayoutCommit();
+
+        const zoom = zoomScaleForViewport(viewportSize, reducedMotion);
+
+        if (!reducedMotion) {
+          await cameraControls.start({
+            scale: 1.03,
+            transition: { duration: 0.09, ease: [0.33, 0.12, 0.38, 1.15] },
+          });
+        }
+
+        await cameraControls.start({
+          scale: zoom,
+          transition: {
+            duration: reducedMotion ? 0.18 : 0.82,
+            ease: [0.22, 0.88, 0.28, 1],
+          },
+        });
+
+        setMeshPaused(false);
+        onFocusAnimationComplete?.(i);
+      } finally {
+        isAnimatingRef.current = false;
+      }
+    },
+    [activePhase, cameraControls, onFocusAnimationComplete, reducedMotion, viewportSize],
+  );
+
+  const focusPanel = useCallback(
+    async (panelIndex: number, origin: ZoomOriginMode = "globe") => {
+      await focusSequence(panelIndex, origin);
+    },
+    [focusSequence],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      nudgeRotate: () => runNudgeAnimation(),
+      focusPanel,
+      resetCamera,
+    }),
+    [runNudgeAnimation, focusPanel, resetCamera],
+  );
+
+  const handleDotActivate = useCallback(
+    (node: EarthNode) => (e: React.MouseEvent | React.KeyboardEvent) => {
+      e.stopPropagation();
+      if ("key" in e) {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+      }
+      const idx = earthNodes.findIndex((n) => n.id === node.id);
+      if (idx >= 0) void focusSequence(idx, "globe");
+    },
+    [focusSequence],
+  );
+
+  const handleCalloutClick = useCallback(
+    (panelIndex: number) => {
+      void focusSequence(panelIndex, "callout");
+    },
+    [focusSequence],
+  );
 
   return (
     <div
-      className="relative flex items-center justify-center"
+      className="relative mx-auto flex h-[min(400px,min(72vw,440px))] w-[min(400px,min(72vw,440px))] items-center justify-center overflow-visible"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Outer glow */}
-      <div
-        className="absolute rounded-full transition-all duration-700"
-        style={{
-          width: "min(420px, 70vw)",
-          height: "min(420px, 70vw)",
-          background: `radial-gradient(circle, hsl(var(--glow-primary) / ${hovered ? 0.35 : 0.15}) 0%, hsl(var(--glow-primary) / ${hovered ? 0.12 : 0.05}) 40%, transparent 70%)`,
-          animation: "pulse-glow 4s ease-in-out infinite",
-        }}
-      />
-
-      {/* Earth circle */}
-      <div
-        className="relative rounded-full overflow-hidden transition-shadow duration-500"
-        style={{
-          width: "min(300px, 55vw)",
-          height: "min(300px, 55vw)",
-          boxShadow: hovered
-            ? "0 0 40px hsl(var(--glow-primary) / 0.6), 0 0 80px hsl(var(--glow-primary) / 0.3), inset 0 0 30px hsl(var(--glow-primary) / 0.2)"
-            : "0 0 20px hsl(var(--glow-primary) / 0.3), 0 0 60px hsl(var(--glow-primary) / 0.1), inset 0 0 20px hsl(var(--glow-primary) / 0.1)",
-        }}
+      <motion.div
+        ref={viewportRef}
+        className="relative z-[5] h-[min(400px,min(72vw,440px))] w-[min(400px,min(72vw,440px))] overflow-visible"
+        style={{ transformOrigin: viewportOrigin }}
+        initial={{ scale: 1 }}
+        animate={cameraControls}
       >
-        {/* SVG world map - more realistic */}
-        <svg
-          viewBox="0 0 300 300"
-          className="absolute inset-0 w-full h-full"
-          style={{ animation: "earth-rotate 40s linear infinite" }}
+        <div className="relative flex h-full w-full items-center justify-center overflow-visible">
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-700"
+          style={{
+            width: "118%",
+            height: "118%",
+            background: `radial-gradient(circle, hsl(var(--glow-primary) / ${hovered ? 0.35 : 0.15}) 0%, hsl(var(--glow-primary) / ${hovered ? 0.12 : 0.05}) 40%, transparent 70%)`,
+            animation: reducedMotion ? undefined : "pulse-glow 4s ease-in-out infinite",
+          }}
+        />
+
+        <motion.div
+          className="relative z-[1] shrink-0 rounded-full overflow-hidden transition-shadow duration-500"
+          style={{
+            width: "min(300px, 79%)",
+            height: "min(300px, 79%)",
+            aspectRatio: "1",
+            transformOrigin: "center center",
+            boxShadow: hovered
+              ? "0 0 40px hsl(var(--glow-primary) / 0.6), 0 0 80px hsl(var(--glow-primary) / 0.3), inset 0 0 30px hsl(var(--glow-primary) / 0.2)"
+              : "0 0 20px hsl(var(--glow-primary) / 0.3), 0 0 60px hsl(var(--glow-primary) / 0.1), inset 0 0 20px hsl(var(--glow-primary) / 0.1)",
+          }}
+          animate={earthDiskControls}
+          initial={{ rotate: 0 }}
         >
+          <div className="absolute inset-0 overflow-hidden rounded-full">
+            <svg viewBox="0 0 300 300" className="pointer-events-none absolute inset-0 z-0 h-full w-full">
+              <defs>
+                <radialGradient id="meshCoreGlow" cx="50%" cy="50%" r="65%">
+                  <stop offset="0%" stopColor="hsl(190 95% 55% / 0.14)" />
+                  <stop offset="55%" stopColor="transparent" />
+                  <stop offset="100%" stopColor="transparent" />
+                </radialGradient>
+              </defs>
+              <rect x="0" y="0" width="300" height="300" fill="hsl(220 42% 8% / 0.52)" />
+              <circle cx="150" cy="150" r="148" fill="url(#meshCoreGlow)" opacity={0.75} />
+            </svg>
+            <div className="absolute inset-0 z-[1] overflow-hidden rounded-full">
+              <EarthGlobeMesh meshPaused={meshPaused} />
+            </div>
+            <svg
+              viewBox="0 0 300 300"
+              className="pointer-events-none absolute inset-0 z-[2] h-full w-full"
+              aria-hidden
+            >
+              <defs>
+                <radialGradient id="earthShadingOverlay" cx="50%" cy="48%">
+                  <stop offset="0%" stopColor="hsl(190 90% 55% / 0.12)" />
+                  <stop offset="45%" stopColor="hsl(200 50% 20% / 0.08)" />
+                  <stop offset="82%" stopColor="hsl(230 45% 6% / 0.55)" />
+                  <stop offset="100%" stopColor="hsl(230 40% 2% / 0.92)" />
+                </radialGradient>
+              </defs>
+              <circle cx="150" cy="150" r="150" fill="url(#earthShadingOverlay)" />
+              <ellipse cx="150" cy="110" rx="52" ry="44" fill="hsl(190 70% 75% / 0.04)" />
+            </svg>
+          </div>
+
+          <div
+            className="pointer-events-none absolute inset-0 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle at 50% 45%, transparent 32%, hsl(190 85% 55% / 0.08) 58%, hsl(190 80% 45% / 0.14) 85%, hsl(190 75% 35% / 0.22) 100%)",
+            }}
+          />
+
+          <div
+            className="pointer-events-none absolute rounded-full"
+            style={{
+              inset: "-3px",
+              border: "2px solid hsl(190 85% 55% / 0.22)",
+              borderRadius: "50%",
+            }}
+          />
+        </motion.div>
+
+        <svg className="absolute inset-0 z-[6] h-full w-full" viewBox={`0 0 ${VIEW} ${VIEW}`}>
           <defs>
-            <clipPath id="earthClip">
-              <circle cx="150" cy="150" r="150" />
-            </clipPath>
-            <radialGradient id="earthShading" cx="35%" cy="35%">
-              <stop offset="0%" stopColor="hsl(200 60% 70% / 0.08)" />
-              <stop offset="50%" stopColor="transparent" />
-              <stop offset="85%" stopColor="hsl(230 40% 3% / 0.5)" />
-              <stop offset="100%" stopColor="hsl(230 40% 3% / 0.85)" />
+            <radialGradient id="scanSweepEarth">
+              <stop offset="0%" stopColor="hsl(var(--glow-primary) / 0)" />
+              <stop offset="70%" stopColor="hsl(var(--glow-primary) / 0)" />
+              <stop offset="100%" stopColor="hsl(var(--glow-primary) / 0.12)" />
             </radialGradient>
-            <radialGradient id="oceanGrad" cx="40%" cy="40%">
-              <stop offset="0%" stopColor="hsl(215 50% 14%)" />
-              <stop offset="100%" stopColor="hsl(220 40% 8%)" />
-            </radialGradient>
-            <linearGradient id="landGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="hsl(160 50% 28%)" />
-              <stop offset="100%" stopColor="hsl(140 40% 22%)" />
-            </linearGradient>
           </defs>
-          <g clipPath="url(#earthClip)">
-            {/* Ocean */}
-            <rect x="-400" y="0" width="1200" height="300" fill="url(#oceanGrad)" />
 
-            {/* More realistic continents - duplicated for seamless rotation */}
-            <g fill="url(#landGrad)" stroke="hsl(160 40% 35% / 0.6)" strokeWidth="0.5">
-              {/* North America */}
-              <path d="M55,52 L62,45 L70,42 L82,40 L95,38 L105,42 L115,48 L120,55 L122,65 L118,75 L112,82 L108,90 L100,98 L95,108 L88,115 L82,118 L78,112 L72,105 L68,95 L60,88 L55,78 L52,68 L53,58 Z" />
-              {/* Central America */}
-              <path d="M82,118 L86,122 L90,128 L88,135 L84,138 L80,132 L78,125 Z" />
-              {/* South America */}
-              <path d="M95,140 L105,136 L112,140 L118,150 L122,162 L124,175 L120,192 L115,205 L108,218 L100,225 L95,220 L90,210 L88,195 L86,178 L88,165 L90,152 Z" />
-              {/* Europe */}
-              <path d="M168,48 L175,42 L185,40 L195,42 L202,48 L205,55 L200,62 L195,68 L188,72 L180,70 L174,65 L170,58 Z" />
-              {/* British Isles */}
-              <path d="M162,48 L166,44 L168,50 L165,54 Z" />
-              {/* Scandinavia */}
-              <path d="M182,30 L188,25 L192,30 L195,38 L190,42 L185,40 L182,35 Z" />
-              {/* Africa */}
-              <path d="M175,78 L185,74 L195,76 L205,80 L212,88 L218,100 L222,115 L224,130 L222,148 L218,162 L210,175 L200,182 L190,178 L182,170 L176,158 L172,142 L170,125 L172,108 L174,95 L175,85 Z" />
-              {/* Madagascar */}
-              <path d="M225,155 L228,150 L230,158 L228,165 L225,162 Z" />
-              {/* Asia */}
-              <path d="M210,38 L225,32 L240,28 L258,30 L272,35 L285,42 L295,50 L300,60 L298,72 L290,80 L280,85 L270,82 L262,78 L255,85 L248,90 L240,88 L232,82 L225,75 L218,68 L212,60 L210,50 Z" />
-              {/* India */}
-              <path d="M248,90 L255,85 L262,92 L265,102 L262,115 L255,122 L248,118 L245,108 L246,98 Z" />
-              {/* Southeast Asia */}
-              <path d="M272,85 L280,82 L285,90 L282,100 L275,105 L270,98 Z" />
-              {/* Japan */}
-              <path d="M292,52 L296,48 L298,55 L296,62 L292,58 Z" />
-              {/* Australia */}
-              <path d="M272,155 L285,148 L298,150 L308,158 L312,168 L308,180 L298,185 L285,182 L275,175 L270,165 Z" />
-              {/* New Zealand */}
-              <path d="M315,185 L318,180 L320,188 L317,192 Z" />
+          <g className="pointer-events-none">
+            <circle
+              cx={CENTER}
+              cy={CENTER}
+              r={R_RING_OUTER}
+              fill="none"
+              stroke="hsl(var(--primary) / 0.12)"
+              strokeWidth="0.75"
+            />
+            <circle
+              cx={CENTER}
+              cy={CENTER}
+              r={R_RING_DASH}
+              fill="none"
+              stroke="hsl(var(--primary) / 0.06)"
+              strokeWidth="0.4"
+              strokeDasharray="3 10"
+            />
 
-              {/* Duplicate set offset by 400 for seamless rotation */}
-              <path d="M455,52 L462,45 L470,42 L482,40 L495,38 L505,42 L515,48 L520,55 L522,65 L518,75 L512,82 L508,90 L500,98 L495,108 L488,115 L482,118 L478,112 L472,105 L468,95 L460,88 L455,78 L452,68 L453,58 Z" />
-              <path d="M482,118 L486,122 L490,128 L488,135 L484,138 L480,132 L478,125 Z" />
-              <path d="M495,140 L505,136 L512,140 L518,150 L522,162 L524,175 L520,192 L515,205 L508,218 L500,225 L495,220 L490,210 L488,195 L486,178 L488,165 L490,152 Z" />
-              <path d="M568,48 L575,42 L585,40 L595,42 L602,48 L605,55 L600,62 L595,68 L588,72 L580,70 L574,65 L570,58 Z" />
-              <path d="M562,48 L566,44 L568,50 L565,54 Z" />
-              <path d="M582,30 L588,25 L592,30 L595,38 L590,42 L585,40 L582,35 Z" />
-              <path d="M575,78 L585,74 L595,76 L605,80 L612,88 L618,100 L622,115 L624,130 L622,148 L618,162 L610,175 L600,182 L590,178 L582,170 L576,158 L572,142 L570,125 L572,108 L574,95 L575,85 Z" />
-              <path d="M625,155 L628,150 L630,158 L628,165 L625,162 Z" />
-              <path d="M610,38 L625,32 L640,28 L658,30 L672,35 L685,42 L695,50 L700,60 L698,72 L690,80 L680,85 L670,82 L662,78 L655,85 L648,90 L640,88 L632,82 L625,75 L618,68 L612,60 L610,50 Z" />
-              <path d="M648,90 L655,85 L662,92 L665,102 L662,115 L655,122 L648,118 L645,108 L646,98 Z" />
-              <path d="M672,85 L680,82 L685,90 L682,100 L675,105 L670,98 Z" />
-              <path d="M692,52 L696,48 L698,55 L696,62 L692,58 Z" />
-              <path d="M672,155 L685,148 L698,150 L708,158 L712,168 L708,180 L698,185 L685,182 L675,175 L670,165 Z" />
-              <path d="M715,185 L718,180 L720,188 L717,192 Z" />
+            {Array.from({ length: 36 }, (_, i) => {
+              const angle = (i * 10 * Math.PI) / 180;
+              const inner = i % 3 === 0 ? R_TICK_IN_MAJOR : R_TICK_IN_MINOR;
+              const outer = R_TICK_OUT;
+              return (
+                <line
+                  key={`tick${i}`}
+                  x1={CENTER + Math.cos(angle) * inner}
+                  y1={CENTER + Math.sin(angle) * inner}
+                  x2={CENTER + Math.cos(angle) * outer}
+                  y2={CENTER + Math.sin(angle) * outer}
+                  stroke={`hsl(var(--primary) / ${i % 3 === 0 ? 0.2 : 0.08})`}
+                  strokeWidth={i % 3 === 0 ? 0.75 : 0.4}
+                />
+              );
+            })}
+
+            <g
+              style={{
+                transformOrigin: `${CENTER}px ${CENTER}px`,
+                animation: reducedMotion ? undefined : "scanner-sweep 5s linear infinite",
+              }}
+            >
+              <line
+                x1={CENTER}
+                y1={CENTER}
+                x2={CENTER}
+                y2={SWEEP_TOP}
+                stroke="hsl(var(--glow-primary) / 0.25)"
+                strokeWidth="0.75"
+              />
+              <path
+                d={`M${CENTER},${CENTER} L${SWEEP_PATH_INNER_X},${SWEEP_TOP} A${R_SWEEP},${R_SWEEP} 0 0,1 ${CENTER},${SWEEP_TOP} Z`}
+                fill="hsl(var(--glow-primary) / 0.04)"
+              />
             </g>
+          </g>
 
-            {/* Grid lines - longitude/latitude */}
-            <g stroke="hsl(var(--primary) / 0.06)" strokeWidth="0.4" fill="none">
-              {/* Latitude lines */}
-              {[37.5, 75, 112.5, 150, 187.5, 225, 262.5].map((y, i) => (
-                <line key={`h${i}`} x1="-400" y1={y} x2="1200" y2={y} />
-              ))}
-              {/* Longitude lines - curved to simulate sphere */}
-              {Array.from({ length: 24 }, (_, i) => (
-                <line key={`v${i}`} x1={i * 33.3 - 400} y1="0" x2={i * 33.3 - 400} y2="300" />
-              ))}
+          {earthNodes.map((pt) => (
+            <g key={pt.id}>
+              <circle
+                className="pointer-events-none"
+                cx={pt.x}
+                cy={pt.y}
+                r={pt.r * 3}
+                fill="none"
+                stroke="hsl(var(--glow-primary) / 0.28)"
+                strokeWidth="0.5"
+                style={{
+                  animation: reducedMotion ? undefined : `data-ping 3s ease-out ${pt.delay}s infinite`,
+                }}
+              />
+              <circle
+                role="button"
+                tabIndex={0}
+                aria-label={`${pt.name}: ${pt.region}. Open details.`}
+                cx={pt.x}
+                cy={pt.y}
+                r={Math.max(pt.r * 2.2, 8)}
+                fill="transparent"
+                stroke="none"
+                className="cursor-pointer outline-none"
+                onClick={handleDotActivate(pt)}
+                onKeyDown={handleDotActivate(pt)}
+              />
+              <circle
+                className="pointer-events-none"
+                cx={pt.x}
+                cy={pt.y}
+                r={pt.r}
+                fill="hsl(var(--glow-primary))"
+                style={{
+                  animation: reducedMotion ? undefined : `twinkle 2s ease-in-out ${pt.delay}s infinite`,
+                }}
+              />
             </g>
+          ))}
 
-            {/* Subtle cloud wisps */}
-            <g fill="hsl(200 30% 80% / 0.04)">
-              <ellipse cx="80" cy="70" rx="40" ry="8" />
-              <ellipse cx="200" cy="120" rx="50" ry="6" />
-              <ellipse cx="140" cy="180" rx="35" ry="7" />
-              <ellipse cx="260" cy="60" rx="45" ry="5" />
-              <ellipse cx="480" cy="70" rx="40" ry="8" />
-              <ellipse cx="600" cy="120" rx="50" ry="6" />
-            </g>
+          <g
+            className="pointer-events-none"
+            fill="hsl(var(--primary) / 0.55)"
+            fontFamily="var(--font-display)"
+            fontSize="6"
+            letterSpacing="1"
+          >
+            <text x={TEXT_INSET} y={TEXT_TOP}>
+              {selectedNode.productTitle}
+            </text>
+            <text x={VIEW - TEXT_INSET} y={TEXT_TOP} textAnchor="end">
+              {selectedNode.region}
+            </text>
+            <text x={TEXT_INSET} y={TEXT_BOTTOM}>
+              {selectedNode.engagementTier}
+            </text>
+            <text x={VIEW - TEXT_INSET} y={TEXT_BOTTOM} textAnchor="end">
+              {selectedNode.statusLabel}
+            </text>
+          </g>
 
-            {/* Shading overlay - 3D sphere effect */}
-            <circle cx="150" cy="150" r="150" fill="url(#earthShading)" />
-
-            {/* Specular highlight */}
-            <ellipse
-              cx="110"
-              cy="100"
-              rx="60"
-              ry="50"
-              fill="hsl(200 60% 80% / 0.03)"
+          <g className="pointer-events-none">
+            <line
+              x1={CENTER}
+              y1={CENTER - CH_OUT}
+              x2={CENTER}
+              y2={CENTER - CH_IN}
+              stroke="hsl(var(--primary) / 0.18)"
+              strokeWidth="0.5"
+            />
+            <line
+              x1={CENTER}
+              y1={CENTER + CH_IN}
+              x2={CENTER}
+              y2={CENTER + CH_OUT}
+              stroke="hsl(var(--primary) / 0.18)"
+              strokeWidth="0.5"
+            />
+            <line
+              x1={CENTER - CH_OUT}
+              y1={CENTER}
+              x2={CENTER - CH_IN}
+              y2={CENTER}
+              stroke="hsl(var(--primary) / 0.18)"
+              strokeWidth="0.5"
+            />
+            <line
+              x1={CENTER + CH_IN}
+              y1={CENTER}
+              x2={CENTER + CH_OUT}
+              y2={CENTER}
+              stroke="hsl(var(--primary) / 0.18)"
+              strokeWidth="0.5"
             />
           </g>
         </svg>
 
-        {/* Atmospheric rim */}
         <div
-          className="absolute inset-0 rounded-full pointer-events-none"
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border"
           style={{
-            background:
-              "radial-gradient(circle at 30% 30%, transparent 40%, hsl(190 80% 60% / 0.06) 65%, hsl(190 80% 50% / 0.12) 85%, hsl(190 80% 40% / 0.2) 100%)",
+            width: "105%",
+            height: "105%",
+            borderColor: "hsl(var(--primary) / 0.05)",
+            animation: reducedMotion ? undefined : "pulse-glow 6s ease-in-out infinite reverse",
           }}
         />
 
-        {/* Atmosphere edge glow */}
-        <div
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            inset: "-3px",
-            border: "2px solid hsl(190 80% 60% / 0.15)",
-            borderRadius: "50%",
-          }}
-        />
-      </div>
-
-      {/* Scouter / Scanner overlay */}
-      <svg
-        className="absolute pointer-events-none"
-        style={{
-          width: "min(380px, 65vw)",
-          height: "min(380px, 65vw)",
-        }}
-        viewBox="0 0 380 380"
-      >
-        <defs>
-          <radialGradient id="scanSweep">
-            <stop offset="0%" stopColor="hsl(var(--glow-primary) / 0)" />
-            <stop offset="70%" stopColor="hsl(var(--glow-primary) / 0)" />
-            <stop offset="100%" stopColor="hsl(var(--glow-primary) / 0.15)" />
-          </radialGradient>
-        </defs>
-
-        {/* Outer ring */}
-        <circle
-          cx="190" cy="190" r="185"
-          fill="none"
-          stroke="hsl(var(--primary) / 0.15)"
-          strokeWidth="1"
-        />
-        {/* Inner measurement ring */}
-        <circle
-          cx="190" cy="190" r="165"
-          fill="none"
-          stroke="hsl(var(--primary) / 0.08)"
-          strokeWidth="0.5"
-          strokeDasharray="4 8"
-        />
-
-        {/* Tick marks around the edge */}
-        {Array.from({ length: 36 }, (_, i) => {
-          const angle = (i * 10 * Math.PI) / 180;
-          const inner = i % 3 === 0 ? 172 : 178;
-          const outer = 185;
-          return (
-            <line
-              key={`tick${i}`}
-              x1={190 + Math.cos(angle) * inner}
-              y1={190 + Math.sin(angle) * inner}
-              x2={190 + Math.cos(angle) * outer}
-              y2={190 + Math.sin(angle) * outer}
-              stroke={`hsl(var(--primary) / ${i % 3 === 0 ? 0.25 : 0.1})`}
-              strokeWidth={i % 3 === 0 ? 1 : 0.5}
-            />
-          );
-        })}
-
-        {/* Rotating scanner sweep */}
-        <g style={{ transformOrigin: "190px 190px", animation: "scanner-sweep 4s linear infinite" }}>
-          <line
-            x1="190" y1="190"
-            x2="190" y2="5"
-            stroke="hsl(var(--glow-primary) / 0.4)"
-            strokeWidth="1"
+        {onFocusAnimationComplete ? (
+          <GlobeCallouts
+            activePhase={activePhase}
+            onCalloutClick={handleCalloutClick}
+            visible={calloutsVisible}
           />
-          <path
-            d="M190,190 L180,10 A185,185 0 0,1 190,5 Z"
-            fill="hsl(var(--glow-primary) / 0.06)"
-          />
-        </g>
-
-        {/* Data points / blips */}
-        {[
-          { x: 130, y: 90, r: 3, delay: 0 },
-          { x: 250, y: 110, r: 2.5, delay: 0.8 },
-          { x: 100, y: 200, r: 2, delay: 1.5 },
-          { x: 280, y: 230, r: 3, delay: 2.2 },
-          { x: 160, y: 280, r: 2, delay: 3 },
-          { x: 230, y: 160, r: 2.5, delay: 0.5 },
-          { x: 145, y: 170, r: 2, delay: 1.8 },
-          { x: 210, y: 260, r: 2, delay: 2.8 },
-        ].map((pt, i) => (
-          <g key={`dp${i}`}>
-            {/* Ping ring */}
-            <circle
-              cx={pt.x} cy={pt.y} r={pt.r * 3}
-              fill="none"
-              stroke="hsl(var(--glow-primary) / 0.3)"
-              strokeWidth="0.5"
-              style={{ animation: `data-ping 3s ease-out ${pt.delay}s infinite` }}
-            />
-            {/* Core dot */}
-            <circle
-              cx={pt.x} cy={pt.y} r={pt.r}
-              fill="hsl(var(--glow-primary))"
-              style={{ animation: `twinkle 2s ease-in-out ${pt.delay}s infinite` }}
-            />
-          </g>
-        ))}
-
-        {/* Corner data readouts */}
-        <g fill="hsl(var(--primary) / 0.5)" fontFamily="var(--font-display)" fontSize="6" letterSpacing="1">
-          <text x="20" y="30">LAT 41.40°N</text>
-          <text x="280" y="30">LON 2.17°W</text>
-          <text x="20" y="365">ALT 420KM</text>
-          <text x="280" y="365">SCAN ACTIVE</text>
-        </g>
-
-        {/* Crosshairs */}
-        <line x1="190" y1="170" x2="190" y2="178" stroke="hsl(var(--primary) / 0.2)" strokeWidth="0.5" />
-        <line x1="190" y1="202" x2="190" y2="210" stroke="hsl(var(--primary) / 0.2)" strokeWidth="0.5" />
-        <line x1="170" y1="190" x2="178" y2="190" stroke="hsl(var(--primary) / 0.2)" strokeWidth="0.5" />
-        <line x1="202" y1="190" x2="210" y2="190" stroke="hsl(var(--primary) / 0.2)" strokeWidth="0.5" />
-      </svg>
-
-      {/* Orbit ring */}
-      <div
-        className="absolute rounded-full border pointer-events-none"
-        style={{
-          width: "min(400px, 68vw)",
-          height: "min(400px, 68vw)",
-          borderColor: "hsl(var(--primary) / 0.06)",
-          animation: "pulse-glow 6s ease-in-out infinite reverse",
-        }}
-      />
+        ) : null}
+        </div>
+      </motion.div>
     </div>
   );
-};
+});
+
+Earth.displayName = "Earth";
 
 export default Earth;
